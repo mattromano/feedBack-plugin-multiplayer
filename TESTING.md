@@ -40,7 +40,7 @@ Scenario 8 needs a chart that contains an actual mid-song tempo change (BPM jump
 **Goal:** confirm the basic happy path works on a low-latency wired network.
 
 1. Both machines on the same wired LAN (or solid 5 GHz Wi-Fi to the same access point).
-2. Machine A creates a room. Machine B joins by code.
+2. Machine A creates a room. Machine B joins by code **on Machine A's server** (rooms live on the server that created them): with the desktop app, turn on **Let other devices on my network join** in the Multiplayer lobby before creating the room, then open the network join link from the room's **How to join this room** panel on Machine B.
 3. Machine A queues a chart and hits play. Confirm both machines' highways are scrolling in sync.
 4. Machine A toggles **Broadcast my sound** ON, strums.
 5. Machine B should hear the host's instrument **one measure delayed**, perfectly aligned to the listener's chart playback.

@@ -109,6 +109,14 @@ git clone https://github.com/got-feedback/feedback-plugin-multiplayer.git multip
 
 Restart Slopsmith and the plugin will appear in the Plugins dropdown.
 
+### Players on other devices (LAN)
+
+A room lives in the memory of the server that created it, so every player must open **that** server — typing the code into another computer's own copy of the app finds no room (the join error says so). The desktop app serves on `127.0.0.1` only by default, which other devices can't reach.
+
+In the desktop app, the Multiplayer lobby shows **Players on other devices → Let other devices on my network join**. It's the desktop's own *Network sharing* setting (also on the Plugins screen): it restarts the app's server listening on all interfaces, on the same port. Turn it on **before** creating a room (the restart closes open rooms); the room's **How to join this room** panel then lists a join link per network address (e.g. `http://192.168.1.20:18000/?mp=ABC234`) to open on the other device. The OS firewall may ask once to allow fee[dB]ack; allow it on private networks only.
+
+> **Security:** while network sharing is on, *anyone* who can reach this computer on the network can use the whole app — library, settings and every plugin's API, not just Multiplayer — and there is no login. It's off by default; only turn it on for a network you trust (home Wi-Fi, not a café or hotel), and turn it off afterwards. Self-hosted servers (e.g. Docker) are reachable on the network already; the same caution applies.
+
 ## For plugin authors
 
 While a browser tab is in a room, the plugin publishes a small public signal other plugins can use without reaching into this one (e.g. a HUD that goes compact during multiplayer):
