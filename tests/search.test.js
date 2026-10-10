@@ -71,3 +71,25 @@ test('an index from a stale result list is ignored', async () => {
     await global.window.mpAddSearchResult(5);
     assert.equal(posts.length, 0);
 });
+
+test('search pages through every match and ranks the Drums version first', async () => {
+    const many = Array.from({ length: 130 }, (_, i) => ({
+        filename: `s${i}`, title: `Song ${i}`, artist: 'A', arrangements: [{ name: 'Lead' }],
+    }));
+    many[120].arrangements = [{ name: 'Lead' }, { name: 'Drums' }];
+    many[120].format = 'feedpak';
+    const pages = [];
+    const { els, m } = freshPlugin({ songs: [] });
+    global.fetch = async url => {
+        const page = Number(new URL(url, 'http://x').searchParams.get('page'));
+        pages.push(page);
+        return { ok: true, json: async () => ({ songs: many.slice(page * 100, page * 100 + 100), total: many.length }) };
+    };
+    await global.window.mpSearchSongs();
+    assert.deepEqual(pages, [0, 1]);
+    const html = els['mp-search-results'].innerHTML;
+    assert.equal((html.match(/mpAddSearchResult\(/g) || []).length, 60);   // capped list
+    assert.ok(html.indexOf('Song 120') < html.indexOf('Song 0'), 'Drums version listed first');
+    assert.ok(html.includes('Lead, Drums · feedpak'));
+    assert.equal(typeof m._sortSearchResults, 'function');
+});
