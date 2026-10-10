@@ -1761,6 +1761,7 @@ function _showLobbyView() {
     if (lobby) lobby.classList.remove('hidden');
     if (room) room.classList.add('hidden');
     if (mixer) mixer.classList.add('hidden');
+    _setInRoomSignal(null);
 }
 
 function _showRoomView() {
@@ -1771,10 +1772,82 @@ function _showRoomView() {
 
     const codeEl = document.getElementById('mp-room-code');
     if (codeEl) codeEl.textContent = _roomCode || '';
+    _renderJoinHelp();
+    _setInRoomSignal(_roomCode);
 
     _renderPlayers();
     _renderQueue();
     _updateControls();
+}
+
+// ── In-room signal for other plugins ───────────────────────────────────
+//
+// <html data-mp-room="CODE"> while this tab is in a room, plus a
+// `multiplayer:room` window event ({ detail: { room: CODE | null } }) on
+// every change, so other plugins (e.g. a HUD that goes compact in
+// multiplayer) can react without reaching into this module. Documented in
+// README "For plugin authors".
+let _signalledRoom = null;
+
+function _setInRoomSignal(code) {
+    const room = code || null;
+    if (room === _signalledRoom) return;
+    _signalledRoom = room;
+    try {
+        const root = document.documentElement;
+        if (root && root.dataset) {
+            if (room) root.dataset.mpRoom = room;
+            else delete root.dataset.mpRoom;
+        }
+        window.dispatchEvent(new CustomEvent('multiplayer:room', { detail: { room } }));
+    } catch (e) { /* no DOM (tests) */ }
+}
+
+// ── "How to join this room" panel ──────────────────────────────────────
+//
+// The join link is this page's own origin + /?mp=CODE (the desktop app
+// picks its port at launch, so there's no fixed address to print);
+// _autoJoinFromUrl handles it on load. When that origin is loopback, other
+// devices can't open it — say so, since "Room not found" from a second
+// computer's own copy of the app is the usual first attempt.
+
+function _isLoopbackHost(hostname) {
+    const h = String(hostname || '').replace(/^\[|\]$/g, '').toLowerCase();
+    return h === 'localhost' || h === '::1' || h.endsWith('.localhost') || /^127\./.test(h);
+}
+
+function _joinLink(origin, code) {
+    return String(origin || '').replace(/\/+$/, '') + '/?mp=' + encodeURIComponent(code || '');
+}
+
+function _renderJoinHelp() {
+    const link = _joinLink(location.origin, _roomCode);
+    const urlEl = document.getElementById('mp-joinhelp-url');
+    if (urlEl) {
+        urlEl.textContent = link;
+        urlEl.href = link;
+    }
+    const codeEl = document.getElementById('mp-joinhelp-code');
+    if (codeEl) codeEl.textContent = _roomCode || '';
+    const noteEl = document.getElementById('mp-joinhelp-local-note');
+    if (noteEl) noteEl.classList.toggle('hidden', !_isLoopbackHost(location.hostname));
+}
+
+window.mpCopyJoinLink = function () {
+    const text = _joinLink(location.origin, _roomCode);
+    if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
+};
+
+// Join-link code check: room codes are 6 characters from _CODE_ALPHABET
+// (routes.py); accept 4-8 alphanumerics like the manual Join form.
+function _parseJoinCode(search) {
+    let code = '';
+    try { code = (new URLSearchParams(search || '').get('mp') || '').trim().toUpperCase(); } catch (e) { return null; }
+    return /^[A-Z0-9]{4,8}$/.test(code) ? code : null;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    Object.assign(module.exports, { _isLoopbackHost, _joinLink, _parseJoinCode });
 }
 
 // ── WebSocket ──────────────────────────────────────────────────────────
@@ -5100,6 +5173,48 @@ window.slopsmithMultiplayerDebug = {
             }
         }
     };
+})();
+
+// ── Join link: /?mp=CODE opens Multiplayer and joins the room ──────────
+//
+// Joins with the saved player name; without one it fills in the code and
+// asks for a name. A reload of a tab that's already in that room just
+// shows it (the showScreen hook above reconnects), and a tab that's in
+// another room is left alone. ?mp= is stripped from the address bar so a
+// later reload can't re-join after the player has left.
+(function _autoJoinFromUrl() {
+    if (typeof location === 'undefined') return;
+    const code = _parseJoinCode(location.search);
+    if (!code) return;
+    try {
+        const u = new URL(location.href);
+        u.searchParams.delete('mp');
+        history.replaceState(history.state, '', u.pathname + u.search + u.hash);
+    } catch (e) { /* ignore */ }
+
+    let tries = 0;
+    (function attempt() {
+        // Plugins load after the shell; wait (up to ~30 s) for our screen.
+        const ready = typeof window.showScreen === 'function'
+            && document.getElementById('plugin-multiplayer')
+            && document.getElementById('mp-join-code');
+        if (!ready) {
+            if (++tries < 150) setTimeout(attempt, 200);
+            return;
+        }
+        window.showScreen('plugin-multiplayer');
+        if (_roomCode) return;
+        _loadSettings();
+        const codeInput = document.getElementById('mp-join-code');
+        const nameInput = document.getElementById('mp-join-name');
+        if (codeInput) codeInput.value = code;
+        if (_playerName) {
+            window.mpJoinRoom();
+        } else if (nameInput) {
+            _showError('Enter your name and click Join to enter room ' + code);
+            nameInput.focus();
+        }
+    })();
 })();
 
 // ── Page unload: tear down the broadcast cleanly ───────────────────────

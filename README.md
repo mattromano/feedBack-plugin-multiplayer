@@ -10,6 +10,7 @@ A [Slopsmith](https://github.com/got-feedback/feedback) plugin that lets multipl
 - NTP-style clock sync with playback drift correction (micro-adjusts playbackRate for smooth alignment)
 - Automatic host promotion if the host disconnects
 - Rooms are ephemeral — destroyed 60 seconds after the last player leaves
+- **Join links** — the room page shows a link (`<this server's address>/?mp=CODE`) under **How to join this room**; opening it goes straight into the room with the player's saved name (it asks for a name once on a new browser). A room lives only on the server that created it, so everyone opens the *same* server — the panel warns when its address (`127.0.0.1` / `localhost`) can't be reached from other devices
 
 ### Shared Song Queue
 - Any player can search the library and add songs to the queue
@@ -107,6 +108,18 @@ git clone https://github.com/got-feedback/feedback-plugin-multiplayer.git multip
 ```
 
 Restart Slopsmith and the plugin will appear in the Plugins dropdown.
+
+## For plugin authors
+
+While a browser tab is in a room, the plugin publishes a small public signal other plugins can use without reaching into this one (e.g. a HUD that goes compact during multiplayer):
+
+- `document.documentElement.dataset.mpRoom` — the room code (`<html data-mp-room="ABC234">`), absent when not in a room. Usable from CSS too: `html[data-mp-room] .my-hud { … }`.
+- a `multiplayer:room` event on `window` whenever that changes, with `event.detail.room` = the room code, or `null` after leaving.
+
+```js
+window.addEventListener('multiplayer:room', (e) => setCompact(!!e.detail.room));
+setCompact(!!document.documentElement.dataset.mpRoom);   // state at load
+```
 
 ## Cross-Platform
 
