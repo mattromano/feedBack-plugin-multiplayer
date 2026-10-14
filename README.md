@@ -10,6 +10,7 @@ A [Slopsmith](https://github.com/got-feedback/feedback) plugin that lets multipl
 - NTP-style clock sync with playback drift correction (micro-adjusts playbackRate for smooth alignment)
 - Automatic host promotion if the host disconnects
 - Rooms are ephemeral — destroyed 60 seconds after the last player leaves
+- **Join links** — the room page shows a link (`<this server's address>/?mp=CODE`) under **How to join this room**; opening it goes straight into the room with the player's saved name (it asks for a name once on a new browser). A room lives only on the server that created it, so everyone opens the *same* server — the panel warns when its address (`127.0.0.1` / `localhost`) can't be reached from other devices
 
 ### Shared Song Queue
 - Any player can search the library and add songs to the queue (every match is searched; songs with more parts, Drums first, are listed first, each labelled with its parts and format)
@@ -110,6 +111,26 @@ git clone https://github.com/got-feedback/feedback-plugin-multiplayer.git multip
 ```
 
 Restart Slopsmith and the plugin will appear in the Plugins dropdown.
+
+### Players on other devices (LAN)
+
+A room lives in the memory of the server that created it, so every player must open **that** server — typing the code into another computer's own copy of the app finds no room (the join error says so). The desktop app serves on `127.0.0.1` only by default, which other devices can't reach.
+
+In the desktop app, the Multiplayer lobby shows **Players on other devices → Let other devices on my network join**. It's the desktop's own *Network sharing* setting (also on the Plugins screen): it restarts the app's server listening on all interfaces, on the same port. Turn it on **before** creating a room (the restart closes open rooms); the room's **How to join this room** panel then lists a join link per network address (e.g. `http://192.168.1.20:18000/?mp=ABC234`) to open on the other device. The OS firewall may ask once to allow fee[dB]ack; allow it on private networks only.
+
+> **Security:** while network sharing is on, *anyone* who can reach this computer on the network can use the whole app — library, settings and every plugin's API, not just Multiplayer — and there is no login. It's off by default; only turn it on for a network you trust (home Wi-Fi, not a café or hotel), and turn it off afterwards. Self-hosted servers (e.g. Docker) are reachable on the network already; the same caution applies.
+
+## For plugin authors
+
+While a browser tab is in a room, the plugin publishes a small public signal other plugins can use without reaching into this one (e.g. a HUD that goes compact during multiplayer):
+
+- `document.documentElement.dataset.mpRoom` — the room code (`<html data-mp-room="ABC234">`), absent when not in a room. Usable from CSS too: `html[data-mp-room] .my-hud { … }`.
+- a `multiplayer:room` event on `window` whenever that changes, with `event.detail.room` = the room code, or `null` after leaving.
+
+```js
+window.addEventListener('multiplayer:room', (e) => setCompact(!!e.detail.room));
+setCompact(!!document.documentElement.dataset.mpRoom);   // state at load
+```
 
 ## Cross-Platform
 

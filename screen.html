@@ -41,6 +41,24 @@
         </div>
 
         <div id="mp-lobby-error" class="text-red-400 text-sm mt-3 hidden"></div>
+
+        <!-- Network sharing (desktop app only; filled by _renderLan) -->
+        <div id="mp-lan-lobby" class="hidden bg-dark-700/50 rounded-xl p-5 border border-gray-800/50 mt-4">
+            <h3 class="text-white font-semibold mb-2">Players on other devices</h3>
+            <label class="flex items-start gap-3 cursor-pointer select-none">
+                <input type="checkbox" id="mp-lan-toggle" onchange="mpSetLanAccess(this.checked)" class="mt-1">
+                <span class="text-sm text-gray-300">
+                    Let other devices on my network join
+                    <span class="block text-xs text-gray-500 mt-0.5">
+                        Lets a laptop, Mac or phone on the same Wi-Fi open this app to join your rooms.
+                        While on, anyone on your network can reach this app (there is no login), so only
+                        use it on a network you trust. Switching it restarts the server and closes open rooms,
+                        so do it before creating a room.
+                    </span>
+                </span>
+            </label>
+            <div id="mp-lan-lobby-status" class="text-xs text-gray-500 mt-2"></div>
+        </div>
     </div>
 
     <!-- ── Room View ───────────────────────────────────────────────── -->
@@ -62,6 +80,34 @@
                 Leave Room
             </button>
         </div>
+
+        <!-- How to join (filled by _renderJoinHelp) -->
+        <details id="mp-joinhelp" class="mb-6 bg-dark-700/50 rounded-xl border border-gray-800/50" open>
+            <summary class="px-5 py-3 cursor-pointer text-sm text-white font-semibold select-none">How to join this room</summary>
+            <div class="px-5 pb-4 text-sm text-gray-400 space-y-3">
+                <div>
+                    <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Join link</div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <a id="mp-joinhelp-url" target="_blank" rel="noopener"
+                            class="font-mono text-accent hover:text-accent-light break-all"></a>
+                        <button onclick="mpCopyJoinLink()" class="px-2 py-0.5 bg-dark-600 hover:bg-dark-500 rounded text-xs text-gray-300">Copy</button>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">Opening it goes straight into this room (it asks for a name the first time).</div>
+                </div>
+                <div id="mp-joinhelp-lan" class="hidden">
+                    <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">From other devices on your network</div>
+                    <div id="mp-joinhelp-lan-links" class="space-y-1"></div>
+                    <div id="mp-joinhelp-lan-note" class="text-xs text-gray-500"></div>
+                </div>
+                <p id="mp-joinhelp-local-note" class="hidden text-xs text-yellow-500">
+                    This address only works on this computer. Rooms live on the server that created them,
+                    so players on other devices must open this server over the network, not their own copy
+                    of the app.
+                </p>
+                <p class="text-xs text-gray-500">Or join by hand: open Multiplayer on the same server, enter a name and the code
+                    <span id="mp-joinhelp-code" class="font-mono text-accent"></span>, then click Join.</p>
+            </div>
+        </details>
 
         <!-- Two-column layout -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">

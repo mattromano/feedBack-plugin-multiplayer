@@ -1578,7 +1578,7 @@ function _saveSettings() {
 }
 
 let _lobbyErrorTimer = null;
-function _showError(msg) {
+function _showError(msg, ms = 5000) {
     const el = document.getElementById('mp-lobby-error');
     if (el) {
         // Cancel any pending hide-timer from a prior error so the new message
@@ -1591,7 +1591,7 @@ function _showError(msg) {
         _lobbyErrorTimer = setTimeout(() => {
             el.classList.add('hidden');
             _lobbyErrorTimer = null;
-        }, 5000);
+        }, ms);
     }
 }
 
@@ -1645,7 +1645,13 @@ window.mpJoinRoom = async function () {
             body: JSON.stringify({ name }),
         });
         const data = await resp.json();
-        if (data.error) { _showError(data.error); return; }
+        if (data.error) {
+            // The usual cause on a second computer: the code was typed into
+            // that computer's own copy of the app, which has no such room.
+            if (resp.status === 404) _showError(data.error + '. ' + ROOM_NOT_FOUND_HINT, 15000);
+            else _showError(data.error);
+            return;
+        }
 
         _roomCode = data.code;
         _playerId = data.player_id;
@@ -1761,6 +1767,8 @@ function _showLobbyView() {
     if (lobby) lobby.classList.remove('hidden');
     if (room) room.classList.add('hidden');
     if (mixer) mixer.classList.add('hidden');
+    _setInRoomSignal(null);
+    _refreshLan();
 }
 
 function _showRoomView() {
@@ -1771,10 +1779,200 @@ function _showRoomView() {
 
     const codeEl = document.getElementById('mp-room-code');
     if (codeEl) codeEl.textContent = _roomCode || '';
+    _renderJoinHelp();
+    _setInRoomSignal(_roomCode);
 
     _renderPlayers();
     _renderQueue();
     _updateControls();
+}
+
+// ── In-room signal for other plugins ───────────────────────────────────
+//
+// <html data-mp-room="CODE"> while this tab is in a room, plus a
+// `multiplayer:room` window event ({ detail: { room: CODE | null } }) on
+// every change, so other plugins (e.g. a HUD that goes compact in
+// multiplayer) can react without reaching into this module. Documented in
+// README "For plugin authors".
+let _signalledRoom = null;
+
+function _setInRoomSignal(code) {
+    const room = code || null;
+    if (room === _signalledRoom) return;
+    _signalledRoom = room;
+    try {
+        const root = document.documentElement;
+        if (root && root.dataset) {
+            if (room) root.dataset.mpRoom = room;
+            else delete root.dataset.mpRoom;
+        }
+        window.dispatchEvent(new CustomEvent('multiplayer:room', { detail: { room } }));
+    } catch (e) { /* no DOM (tests) */ }
+}
+
+// ── "How to join this room" panel ──────────────────────────────────────
+//
+// The join link is this page's own origin + /?mp=CODE (the desktop app
+// picks its port at launch, so there's no fixed address to print);
+// _autoJoinFromUrl handles it on load. When that origin is loopback, other
+// devices can't open it — say so, since "Room not found" from a second
+// computer's own copy of the app is the usual first attempt.
+
+function _isLoopbackHost(hostname) {
+    const h = String(hostname || '').replace(/^\[|\]$/g, '').toLowerCase();
+    return h === 'localhost' || h === '::1' || h.endsWith('.localhost') || /^127\./.test(h);
+}
+
+function _joinLink(origin, code) {
+    return String(origin || '').replace(/\/+$/, '') + '/?mp=' + encodeURIComponent(code || '');
+}
+
+function _renderJoinHelp() {
+    const link = _joinLink(location.origin, _roomCode);
+    const urlEl = document.getElementById('mp-joinhelp-url');
+    if (urlEl) {
+        urlEl.textContent = link;
+        urlEl.href = link;
+    }
+    const codeEl = document.getElementById('mp-joinhelp-code');
+    if (codeEl) codeEl.textContent = _roomCode || '';
+    _refreshLan();
+}
+
+const ROOM_NOT_FOUND_HINT = "Rooms live on the computer that created them: open the host's join link "
+    + '(in their room under "How to join this room") instead of joining from your own copy of the app.';
+
+// ── Players on other devices (desktop LAN access) ──────────────────────
+//
+// The desktop app serves on 127.0.0.1 only, so another device on the
+// network can't reach it — and typing the code into that device's own
+// app finds no room (rooms live in this server's memory). The desktop
+// already has an opt-in "LAN access" switch that rebinds its server to
+// 0.0.0.0 (feedBack-desktop: Plugins screen → Network sharing), exposed to
+// pages as window.feedBackDesktop.network. Surface it here: a toggle in
+// the lobby (switching restarts the server, which drops in-memory rooms,
+// so it doesn't belong inside a room) and the network join links in the
+// room panel. No server code is involved, and nothing is shown in a plain
+// browser or on a guest's device (no desktop bridge there).
+
+let _lanState = null;    // { enabled, urls } from the desktop, or null
+let _lanBusy = false;
+
+function _lanApi() {
+    const d = (typeof window !== 'undefined') ? window.feedBackDesktop : null;
+    const n = d ? d.network : null;
+    return (n && typeof n.getLanAccess === 'function' && typeof n.setLanAccess === 'function') ? n : null;
+}
+
+function _refreshLan() {
+    const api = _lanApi();
+    if (!api) { _renderLan(); return Promise.resolve(); }
+    return Promise.resolve()
+        .then(() => api.getLanAccess())
+        .then(st => { _lanState = st || null; })
+        .catch(() => { _lanState = null; })
+        .then(_renderLan);
+}
+
+// Join links for the room on each network address the desktop reported.
+function _lanJoinLinks(state, code) {
+    if (!state || !state.enabled || !Array.isArray(state.urls)) return [];
+    return state.urls.filter(u => typeof u === 'string' && /^https?:\/\//.test(u)).map(u => _joinLink(u, code));
+}
+
+function _lanLobbyStatus(st, busy) {
+    if (busy) return 'Restarting the server…';
+    if (!st) return '';
+    if (!st.enabled) return 'Off. Only this computer can join rooms.';
+    return (Array.isArray(st.urls) && st.urls.length)
+        ? 'On. Create a room: its "How to join this room" panel lists the links to open on the other devices.'
+        : 'On, but no network address was found. Is this computer on Wi-Fi or Ethernet?';
+}
+
+function _renderLan() {
+    const api = _lanApi();
+    const st = _lanState;
+
+    const lobbyBox = document.getElementById('mp-lan-lobby');
+    if (lobbyBox) lobbyBox.classList.toggle('hidden', !api);
+    const toggle = document.getElementById('mp-lan-toggle');
+    if (toggle) { toggle.checked = !!(st && st.enabled); toggle.disabled = _lanBusy; }
+    const lobbyStatus = document.getElementById('mp-lan-lobby-status');
+    if (lobbyStatus) lobbyStatus.textContent = _lanLobbyStatus(st, _lanBusy);
+
+    // Room panel. The generic "only this computer" note is for setups
+    // without the desktop switch (e.g. a server started on 127.0.0.1).
+    const loopback = typeof location !== 'undefined' && _isLoopbackHost(location.hostname);
+    const localNote = document.getElementById('mp-joinhelp-local-note');
+    if (localNote) localNote.classList.toggle('hidden', !loopback || !!api);
+    const section = document.getElementById('mp-joinhelp-lan');
+    if (section) section.classList.toggle('hidden', !api);
+    const links = document.getElementById('mp-joinhelp-lan-links');
+    const note = document.getElementById('mp-joinhelp-lan-note');
+    if (!api || !links || !note) return;
+    links.innerHTML = '';
+    const joinLinks = _lanJoinLinks(st, _roomCode);
+    for (const link of joinLinks) {
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-2 flex-wrap';
+        const text = document.createElement('span');
+        text.className = 'font-mono text-accent break-all';
+        text.textContent = link;
+        const btn = document.createElement('button');
+        btn.className = 'px-2 py-0.5 bg-dark-600 hover:bg-dark-500 rounded text-xs text-gray-300';
+        btn.textContent = 'Copy';
+        btn.onclick = () => _copyText(link);
+        row.appendChild(text);
+        row.appendChild(btn);
+        links.appendChild(row);
+    }
+    if (!st) note.textContent = '';
+    else if (!st.enabled) {
+        note.textContent = 'Off, so only this computer can join. To let other devices in, leave this room, turn on '
+            + '"Let other devices on my network join" in the Multiplayer lobby, then create a new room.';
+    } else {
+        note.textContent = joinLinks.length
+            ? 'Open a link on the other device. Your firewall may ask once to allow fee[dB]ack: allow it on private networks.'
+            : 'On, but no network address was found for this computer.';
+    }
+}
+
+window.mpSetLanAccess = async function (on) {
+    const api = _lanApi();
+    if (!api || _lanBusy) return;
+    _lanBusy = true;
+    _renderLan();
+    try {
+        const res = await api.setLanAccess(!!on);
+        _lanState = { enabled: !!(res && res.enabled), urls: (res && res.urls) || [] };
+    } catch (e) {
+        _showError('Could not change network sharing: ' + ((e && e.message) || e));
+    } finally {
+        _lanBusy = false;
+    }
+    await _refreshLan();
+};
+
+function _copyText(text) {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        navigator.clipboard.writeText(text).catch(() => {});
+    }
+}
+
+window.mpCopyJoinLink = function () {
+    _copyText(_joinLink(location.origin, _roomCode));
+};
+
+// Join-link code check: room codes are 6 characters from _CODE_ALPHABET
+// (routes.py); accept 4-8 alphanumerics like the manual Join form.
+function _parseJoinCode(search) {
+    let code = '';
+    try { code = (new URLSearchParams(search || '').get('mp') || '').trim().toUpperCase(); } catch (e) { return null; }
+    return /^[A-Z0-9]{4,8}$/.test(code) ? code : null;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    Object.assign(module.exports, { _isLoopbackHost, _joinLink, _parseJoinCode, _lanJoinLinks });
 }
 
 // ── WebSocket ──────────────────────────────────────────────────────────
@@ -5305,6 +5503,48 @@ window.slopsmithMultiplayerDebug = {
             }
         }
     };
+})();
+
+// ── Join link: /?mp=CODE opens Multiplayer and joins the room ──────────
+//
+// Joins with the saved player name; without one it fills in the code and
+// asks for a name. A reload of a tab that's already in that room just
+// shows it (the showScreen hook above reconnects), and a tab that's in
+// another room is left alone. ?mp= is stripped from the address bar so a
+// later reload can't re-join after the player has left.
+(function _autoJoinFromUrl() {
+    if (typeof location === 'undefined') return;
+    const code = _parseJoinCode(location.search);
+    if (!code) return;
+    try {
+        const u = new URL(location.href);
+        u.searchParams.delete('mp');
+        history.replaceState(history.state, '', u.pathname + u.search + u.hash);
+    } catch (e) { /* ignore */ }
+
+    let tries = 0;
+    (function attempt() {
+        // Plugins load after the shell; wait (up to ~30 s) for our screen.
+        const ready = typeof window.showScreen === 'function'
+            && document.getElementById('plugin-multiplayer')
+            && document.getElementById('mp-join-code');
+        if (!ready) {
+            if (++tries < 150) setTimeout(attempt, 200);
+            return;
+        }
+        window.showScreen('plugin-multiplayer');
+        if (_roomCode) return;
+        _loadSettings();
+        const codeInput = document.getElementById('mp-join-code');
+        const nameInput = document.getElementById('mp-join-name');
+        if (codeInput) codeInput.value = code;
+        if (_playerName) {
+            window.mpJoinRoom();
+        } else if (nameInput) {
+            _showError('Enter your name and click Join to enter room ' + code);
+            nameInput.focus();
+        }
+    })();
 })();
 
 // ── Page unload: tear down the broadcast cleanly ───────────────────────
