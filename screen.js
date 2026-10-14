@@ -5562,13 +5562,13 @@ window.addEventListener('beforeunload', () => {
 
 // Node-only test hook (tests/*.test.js); browsers never see `module`.
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
+    Object.assign(module.exports, {
         _setRoomForTest(code, playerId) { _roomCode = code; _playerId = playerId; },
         DEFAULT_ARRANGEMENTS,
         _arrangementNames, _arrangementChoices, _arrangementOptionsHtml,
         _resolveArrangementIndex, _arrangementFixIndex, _arrangementSourceItem,
         _sortSearchResults, _searchResultParts,
-    };
+    });
 }
 
 })();
