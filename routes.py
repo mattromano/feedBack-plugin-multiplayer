@@ -225,6 +225,17 @@ async def _safe_close(ws, code):
         pass
 
 
+def _num_or_none(v):
+    """A finite number from a client message, else None (JSON null)."""
+    if isinstance(v, bool):
+        return None
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return f if math.isfinite(f) else None
+
+
 def _new_session_record(session_id, highway_ws=None, audio_ws=None):
     return {
         "session_id": session_id,
@@ -1903,6 +1914,10 @@ def setup(app, context):
                 "time": room["time"],
                 "speed": room["speed"],
                 "server_time": server_time,
+                # Host clock stamp + output latency so guests line up
+                # what they hear with the host (screen.js _hostTimeNow).
+                "host_server_t": _num_or_none(data.get("host_server_t")),
+                "ahead_ms": _num_or_none(data.get("ahead_ms")),
             }, exclude=player_id)
 
         elif msg_type == "pause" and is_host:
@@ -1943,6 +1958,8 @@ def setup(app, context):
                 "time": room["time"],
                 "state": room["state"],
                 "server_time": server_time,
+                "host_server_t": _num_or_none(data.get("host_server_t")),
+                "ahead_ms": _num_or_none(data.get("ahead_ms")),
             }, exclude=player_id)
 
         elif msg_type == "start_recording" and is_host:

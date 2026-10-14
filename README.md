@@ -7,7 +7,7 @@ A [Slopsmith](https://github.com/got-feedback/feedback) plugin that lets multipl
 ### Synced Rooms
 - Create or join a room with a 6-character code
 - Host controls playback (play/pause/seek/speed) — all players stay in sync
-- NTP-style clock sync with playback drift correction (micro-adjusts playbackRate for smooth alignment)
+- NTP-style clock sync (min-RTT round, re-measured every 30 s); guests line up with the host using the host's clock stamp and the difference in output latency, and correct drift by seeking (over 30 ms on 3 heartbeats in a row) rather than nudging playbackRate, which would switch the stems pitch worklet in and out
 - Automatic host promotion if the host disconnects
 - Rooms are ephemeral — destroyed 60 seconds after the last player leaves
 - **Join links** — the room page shows a link (`<this server's address>/?mp=CODE`) under **How to join this room**; opening it goes straight into the room with the player's saved name (it asks for a name once on a new browser). A room lives only on the server that created it, so everyone opens the *same* server — the panel warns when its address (`127.0.0.1` / `localhost`) can't be reached from other devices
