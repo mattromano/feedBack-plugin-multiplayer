@@ -12,13 +12,14 @@ A [Slopsmith](https://github.com/got-feedback/feedback) plugin that lets multipl
 - Rooms are ephemeral — destroyed 60 seconds after the last player leaves
 
 ### Shared Song Queue
-- Any player can search the library and add songs to the queue
+- Any player can search the library and add songs to the queue (every match is searched; songs with more parts, Drums first, are listed first, each labelled with its parts and format)
 - Drag to reorder, remove songs, vote to skip (majority rules)
 - Auto-advance to the next song when one finishes
 - Host can click any queued song to load it immediately
 
 ### Per-Player Arrangements
-- Each player picks their arrangement (Lead/Rhythm/Bass)
+- Each player picks their arrangement from the queued song's actual arrangements (Lead, Combo, Rhythm, Bass, then others such as Drums); Lead/Rhythm/Bass is shown when the song's list isn't known
+- Changing your pick mid-song switches your highway in place (position and play state kept); a pick the next song lacks is kept for later songs and shown as "(not in this song)" — that song loads your default arrangement instead (as does a part the highway can't load as an arrangement)
 - Everyone sees their own highway with their chosen arrangement
 - Multiple players can pick the same arrangement
 
@@ -77,6 +78,8 @@ The broadcaster sees a `⚠ Tempo change at this measure` banner when this happe
 While broadcasting, the panel shows aggregate listener stats from each peer's listener pipeline (e.g. `2 listeners — 1 late, 0 dropped`). Reports are 30-second rolling deltas from the listener's perspective; "late" means a frame arrived after its scheduled chart-time, "dropped" means decoder/validation failure. Healthy operation reports `no issues`.
 
 #### Testing
+
+Automated: `node --test tests/*.test.js` (picker + search helpers) and `pytest` from this directory (needs `requirements-test.txt`: pytest-asyncio + pytest-timeout).
 
 Before tagging a release, run through the manual test matrix in [TESTING.md](TESTING.md) — covers two-machine LAN sanity, hotspot/RTT, network drop, pause/seek, refresh on either side, 30-min soak, tempo-change verification, and multi-broadcaster preemption.
 
