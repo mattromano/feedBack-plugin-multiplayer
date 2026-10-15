@@ -40,11 +40,19 @@ test('Drums is selectable when the song has it', () => {
     assert.equal(choices.length, 3);
 });
 
-test('falls back to Lead/Rhythm/Bass when the song arrangements are unknown', () => {
+test('falls back to Lead/Rhythm/Bass/Drums when the song arrangements are unknown', () => {
     const m = freshPlugin();
-    assert.deepEqual(values(m._arrangementChoices([], 'Rhythm')), ['Lead', 'Rhythm', 'Bass']);
-    assert.deepEqual(values(m._arrangementChoices(undefined, 'Lead')), ['Lead', 'Rhythm', 'Bass']);
-    assert.deepEqual(m.DEFAULT_ARRANGEMENTS, ['Lead', 'Rhythm', 'Bass']);
+    assert.deepEqual(values(m._arrangementChoices([], 'Rhythm')), ['Lead', 'Rhythm', 'Bass', 'Drums']);
+    assert.deepEqual(values(m._arrangementChoices(undefined, 'Lead')), ['Lead', 'Rhythm', 'Bass', 'Drums']);
+    assert.deepEqual(m.DEFAULT_ARRANGEMENTS, ['Lead', 'Rhythm', 'Bass', 'Drums']);
+});
+
+test('Drums can be picked before anything is queued', () => {
+    const m = freshPlugin();
+    const choices = m._arrangementChoices([], 'Drums');
+    assert.deepEqual(selected(choices), ['Drums']);
+    assert.equal(choices.filter(c => c.value === 'Drums').length, 1);
+    assert.equal(choices.find(c => c.value === 'Drums').label, 'Drums');
 });
 
 test('a pick the song lacks is kept (sticky) and flagged', () => {

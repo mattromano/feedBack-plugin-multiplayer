@@ -4634,7 +4634,7 @@ function _findPlayerName(playerId) {
 // to the server's choice (user's default arrangement, else most notes).
 // Pure helpers are exported for Node tests (tests/arrangements.test.js).
 
-const DEFAULT_ARRANGEMENTS = ['Lead', 'Rhythm', 'Bass'];
+const DEFAULT_ARRANGEMENTS = ['Lead', 'Rhythm', 'Bass', 'Drums'];
 // Same order core uses for the library index and the highway's
 // arrangement list (Lead > Combo > Rhythm > Bass > others).
 const ARRANGEMENT_PRIORITY = new Map([['Lead', 0], ['Combo', 1], ['Rhythm', 2], ['Bass', 3]]);

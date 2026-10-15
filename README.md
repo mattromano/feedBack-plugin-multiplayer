@@ -19,7 +19,7 @@ A [Slopsmith](https://github.com/got-feedback/feedback) plugin that lets multipl
 - Host can click any queued song to load it immediately
 
 ### Per-Player Arrangements
-- Each player picks their arrangement from the queued song's actual arrangements (Lead, Combo, Rhythm, Bass, then others such as Drums); Lead/Rhythm/Bass is shown when the song's list isn't known
+- Each player picks their arrangement from the queued song's actual arrangements (Lead, Combo, Rhythm, Bass, then others such as Drums); Lead/Rhythm/Bass/Drums is shown when the song's list isn't known (e.g. nothing queued yet)
 - Changing your pick mid-song switches your highway in place (position and play state kept); a pick the next song lacks is kept for later songs and shown as "(not in this song)" — that song loads your default arrangement instead (as does a part the highway can't load as an arrangement)
 - Everyone sees their own highway with their chosen arrangement
 - Multiple players can pick the same arrangement
